@@ -4,11 +4,21 @@ import os
 import shutil
 import zipfile
 import streamlit as st
+import platform
 
 
 def create_react_app(payload_json):
-    # Parse the payload JSON
+    # ...existing code...
     try:
+        # Check if npm is available
+        if shutil.which("npm") is None:
+            return None, "'npm' is not installed or not found in PATH."
+        else:
+            print("'npm' is available in PATH.")
+
+        # Get current working directory
+        cwd = os.getcwd()
+
         print("Received payload:", payload_json)
         payload = json.loads(payload_json)
         project_name = payload.get("project_name", "default_project").lower()
@@ -25,10 +35,25 @@ def create_react_app(payload_json):
         print(
             f"Creating React app with framework '{framework}' and project name '{project_name}'...")
 
-        subprocess.run([
-            "npm", "create", "vite@latest", project_name,
-            "--", "--template", f"{framework}"
-        ], check=True)
+        print(f"Current working directory: {cwd}")
+        print(f"Project directory: {project_dir}")
+
+        # Create command based on OS
+        npm_cmd = "npm.cmd" if platform.system() == "Windows" else "npm"
+
+        result = subprocess.run(
+            [
+                npm_cmd, "create", "vite@latest", project_name,
+                "--", "--template", f"{framework}"
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        print("Vite output:", result.stdout)
+        if result.stderr:
+            print("Vite errors:", result.stderr)
 
         # Verify the project directory exists
         if not os.path.exists(project_dir):
@@ -56,9 +81,16 @@ def create_react_app(payload_json):
                     file_path = os.path.join(root, file)
                     # Calculate relative path for zip structure
                     relative_path = os.path.relpath(file_path, cwd)
+                    # Use os.path.normpath to handle path separators correctly across platforms
+                    relative_path = os.path.normpath(relative_path)
                     zipf.write(file_path, relative_path)
 
         print(f"Zip archive created at {zip_path}")
+
+        # Step 3: Clean up the project directory
+        print(f"Cleaning up project directory: {project_dir}")
+        shutil.rmtree(project_dir, ignore_errors=True)
+        print(f"Project directory {project_dir} cleaned up.")
 
         # Verify the zip file exists
         if not os.path.exists(zip_path):
